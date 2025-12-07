@@ -31,6 +31,14 @@ class Plotter:
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", title.strip()).strip("_").lower()
         return slug or "figure"
 
+    @staticmethod
+    def _iqr_bounds(series, k: float = 1.5):
+        """Return IQR-based lower/upper bounds for a numeric series."""
+        q1 = series.quantile(0.25)
+        q3 = series.quantile(0.75)
+        iqr = q3 - q1
+        return q1 - k * iqr, q3 + k * iqr
+
     def _finalize(self, title: str | None, xlabel: str | None, ylabel: str | None):
         if title:
             plt.title(title)
@@ -49,16 +57,32 @@ class Plotter:
         plt.show()
         plt.close()
 
-    def plot_histogram(self, df, column, title=None, xlabel=None, ylabel="Count", bins=20):
-        """Plot and save a histogram with KDE."""
+    def plot_histogram(
+        self,
+        df,
+        column,
+        title=None,
+        xlabel=None,
+        ylabel="Count",
+        bins=30,
+        hue=None,
+        kde=True,
+        log_scale=False,
+    ):
+        """Plot and save a histogram for a numeric column with optional hue/KDE."""
         plt.figure()
-        sns.histplot(data=df, x=column, bins=bins, kde=True)
+        sns.histplot(data=df, x=column, bins=bins, kde=kde, hue=hue, multiple="stack")
+        if log_scale:
+            plt.xscale("log")
         self._finalize(title or f"Distribution of {column}", xlabel or column, ylabel)
 
-    def plot_bar(self, df, x, y, title=None, xlabel=None, ylabel=None):
-        """Plot and save a bar chart."""
+    def plot_bar(self, df, x, y, title=None, xlabel=None, ylabel=None, top_n: int | None = None, order=None):
+        """Plot and save a bar chart, optionally limiting to top N categories."""
+        data = df.copy()
+        if top_n and x in data.columns:
+            data = data.nlargest(top_n, y)
         plt.figure()
-        sns.barplot(data=df, x=x, y=y)
+        sns.barplot(data=data, x=x, y=y, order=order)
         plt.xticks(rotation=45)
         self._finalize(title or f"{y} by {x}", xlabel or x, ylabel or y)
 
@@ -69,9 +93,40 @@ class Plotter:
         plt.xticks(rotation=45)
         self._finalize(title or f"{value_col} over Time", xlabel or date_col, ylabel or value_col)
 
-    def plot_box(self, df, y, x=None, title=None, xlabel=None, ylabel=None):
-        """Plot and save a boxplot (optionally grouped by x)."""
+    def plot_box(self, df, y, x=None, title=None, xlabel=None, ylabel=None, hue=None):
+        """Plot and save a boxplot (optionally grouped by x/hue)."""
         plt.figure()
-        sns.boxplot(data=df, x=x, y=y)
+        sns.boxplot(data=df, x=x, y=y, hue=hue)
         plt.xticks(rotation=45)
         self._finalize(title or f"Distribution of {y}", xlabel or (x if x else ""), ylabel or y)
+
+    def plot_scatter(
+        self,
+        df,
+        x,
+        y,
+        title=None,
+        xlabel=None,
+        ylabel=None,
+        hue=None,
+        alpha: float = 0.5,
+        fit_line: bool = False,
+    ):
+        """Plot and save a scatter plot (optionally with a trend line)."""
+        plt.figure()
+        sns.scatterplot(data=df, x=x, y=y, hue=hue, alpha=alpha)
+        if fit_line:
+            sns.regplot(data=df, x=x, y=y, scatter=False, color="black")
+        plt.xticks(rotation=45)
+        self._finalize(title or f"{y} vs {x}", xlabel or x, ylabel or y)
+
+    def plot_outlier_box(self, df, column, k: float = 1.5, title=None, xlabel=None, ylabel=None):
+        """Box plot with IQR whisker lines annotated for quick outlier review."""
+        clean_series = df[column].dropna()
+        lower, upper = self._iqr_bounds(clean_series, k=k)
+        plt.figure()
+        sns.boxplot(x=clean_series)
+        plt.axvline(lower, color="red", linestyle="--", label=f"Lower ({lower:.2f})")
+        plt.axvline(upper, color="red", linestyle="--", label=f"Upper ({upper:.2f})")
+        plt.legend()
+        self._finalize(title or f"Outlier Check: {column}", xlabel or column, ylabel or (ylabel or ""))

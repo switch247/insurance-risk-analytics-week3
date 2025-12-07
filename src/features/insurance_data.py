@@ -166,6 +166,34 @@ def aggregate_loss(df: pd.DataFrame, group_cols: List[str]) -> pd.DataFrame:
     return agg
 
 
+def claims_premium_summary(df: pd.DataFrame) -> pd.DataFrame:
+    """Focused summary stats for premium/claims and related ratios."""
+    premium = df.get("TotalPremium")
+    claims = df.get("TotalClaims")
+    if premium is None or claims is None:
+        return pd.DataFrame()
+
+    totals = {
+        "total_premium": premium.sum(skipna=True),
+        "total_claims": claims.sum(skipna=True),
+    }
+    totals["overall_loss_ratio"] = (
+        totals["total_claims"] / totals["total_premium"] if totals["total_premium"] > 0 else np.nan
+    )
+    claim_rate = (claims > 0).mean()
+
+    dist = {
+        "mean_premium": premium.mean(skipna=True),
+        "median_premium": premium.median(skipna=True),
+        "p95_premium": premium.quantile(0.95),
+        "mean_claims": claims.mean(skipna=True),
+        "median_claims": claims.median(skipna=True),
+        "p95_claims": claims.quantile(0.95),
+    }
+
+    return pd.DataFrame([{**totals, **dist, "claim_rate": claim_rate}])
+
+
 def summarize_numerics(df: pd.DataFrame, cols: Iterable[str]) -> pd.DataFrame:
     """Quick descriptive statistics for selected numeric columns."""
     cols = [c for c in cols if c in df.columns]
@@ -190,3 +218,32 @@ def monthly_trends(df: pd.DataFrame) -> pd.DataFrame:
     monthly["loss_ratio"] = np.where(monthly["premium_sum"] > 0, monthly["claims_sum"] / monthly["premium_sum"], np.nan)
     monthly["month"] = monthly["month"].astype(str)
     return monthly
+
+
+def outlier_report(df: pd.DataFrame, cols: Iterable[str], k: float = 1.5) -> pd.DataFrame:
+    """Summarize IQR outlier bounds and prevalence for selected numeric columns."""
+    rows = []
+    for col in cols:
+        if col not in df.columns:
+            continue
+        series = df[col].dropna()
+        if series.empty:
+            continue
+        lower, upper = iqr_bounds(series, k=k)
+        mask = flag_outliers(series, k=k)
+        rows.append(
+            {
+                "column": col,
+                "lower": lower,
+                "upper": upper,
+                "outlier_share": mask.mean(),
+                "count": len(series),
+                "min": series.min(),
+                "q1": series.quantile(0.25),
+                "median": series.median(),
+                "q3": series.quantile(0.75),
+                "max": series.max(),
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values("outlier_share", ascending=False)
