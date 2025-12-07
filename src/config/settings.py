@@ -1,46 +1,43 @@
-"""
-Configuration file for Bank Reviews Analysis Project
-"""
-import os
-from dotenv import load_dotenv
+"""Central configuration for the insurance risk analytics project."""
+from __future__ import annotations
 
-# Load environment variables
-load_dotenv()
-
-# Google Play Store App IDs
-# Keys: CBE, BOA (Bank of Abyssinia), Dashen
-
-APP_IDS = {
-    'CBE': os.getenv('CBE_APP_ID', 'com.combanketh.mobilebanking'),
-    'BOA': os.getenv('BOA_APP_ID', 'com.boa.boaMobileBanking'),
-    'Dashen': os.getenv('DASHEN_APP_ID', 'com.dashen.dashensuperapp') 
-}
-
-# Bank Names Mapping (consistent keys with APP_IDS)
-BANK_NAMES = {
-    'CBE': 'Commercial Bank of Ethiopia',
-    'BOA': 'Bank of Abyssinia',
-    'Dashen': 'Dashen Bank'
-}
-
-# Scraping Configuration
-SCRAPING_CONFIG = {
-    'reviews_per_bank': int(os.getenv('REVIEWS_PER_BANK', 400)),
-    'max_retries': int(os.getenv('MAX_RETRIES', 3)),
-    'lang': 'en',
-    'country': 'et'  # Ethiopia
-}
-
-# File Paths - Use absolute paths from project root
 from pathlib import Path
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent  # Go up to project root
-DATA_DIR = PROJECT_ROOT / 'data'
+from pydantic_settings import BaseSettings
 
+
+class Settings(BaseSettings):
+    project_name: str = "Insurance Risk Analytics"
+
+    # Base paths
+    root_dir: Path = Path(__file__).resolve().parents[2]
+    data_dir: Path = root_dir / "data"
+    raw_data_dir: Path = data_dir / "raw"
+    processed_data_dir: Path = data_dir / "processed"
+    outputs_dir: Path = root_dir / "outputs"
+    figures_dir: Path = outputs_dir / "figures"
+    reports_dir: Path = outputs_dir / "reports"
+
+    # File names
+    raw_data_file: str = "MachineLearningRating_v3.txt"
+    processed_data_file: str = "insurance_clean.csv"
+
+    @property
+    def raw_data_path(self) -> Path:
+        return self.raw_data_dir / self.raw_data_file
+
+    @property
+    def processed_data_path(self) -> Path:
+        return self.processed_data_dir / self.processed_data_file
+
+
+settings = Settings()
+
+# Backward-compatible mapping used by legacy modules
 DATA_PATHS = {
-    'raw': str(DATA_DIR / 'raw'),
-    'processed': str(DATA_DIR / 'processed'),
-    'raw_reviews': str(DATA_DIR / 'raw' / 'reviews_raw.csv'),
-    'processed_reviews': str(DATA_DIR / 'processed' / 'reviews_processed.csv'),
-    'sentiment_results': str(DATA_DIR / 'processed' / 'reviews_with_sentiment.csv'),
-    'final_results': str(DATA_DIR / 'processed' / 'reviews_final.csv')
+    "raw": str(settings.raw_data_dir),
+    "processed": str(settings.processed_data_dir),
+    "raw_reviews": str(settings.raw_data_path),
+    "processed_reviews": str(settings.processed_data_path),
+    "figures": str(settings.figures_dir),
+    "reports": str(settings.reports_dir),
 }
