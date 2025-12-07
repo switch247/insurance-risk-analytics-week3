@@ -1,1 +1,1 @@
-from .settings import APP_IDS, BANK_NAMES, SCRAPING_CONFIG, DATA_PATHS
+from .settings import DATA_PATHS
