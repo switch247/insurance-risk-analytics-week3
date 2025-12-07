@@ -35,6 +35,7 @@ dvc.yaml             # data & model pipelines (versioned)
 ```
 
 ## Quickstart (Windows PowerShell)
+> Use the project virtual env for all commands: `.\.venv\Scripts\Activate.ps1`
 ```powershell
 # create/activate venv
 python -m venv .venv
@@ -46,29 +47,59 @@ pip install -r requirements.txt
 # optional: install extras for SHAP/LIME/XGBoost
 pip install shap lime xgboost
 
+# prepare processed data via DVC pipeline
+dvc repro
+
 # run EDA (example)
-python .\scripts\run_eda.py --data data/raw/insurance.csv --out outputs/eda
+python .\scripts\run_eda.py --data data/processed/insurance_clean.csv --out outputs/eda
 
 # run hypothesis tests
 python .\scripts\run_hypothesis_tests.py --data data/processed/insurance_clean.csv --out outputs/stats
 
 # train models
-python .\scripts\train_models.py --data data/processed/insurance_clean.csv --out outputs/models
+python .\scripts\train_sentiment_analysis_model.py --data data/processed/insurance_clean.csv --out outputs/models
 ```
 
 ## DVC (reproducible data & models)
+Pipeline is defined in `dvc.yaml` with stage `prepare_data`:
+```yaml
+stages:
+  prepare_data:
+    cmd: .\.venv\Scripts\python scripts/prepare_insurance_data.py
+    deps:
+    - data/raw/MachineLearningRating_v3.txt
+    - scripts/prepare_insurance_data.py
+    outs:
+    - data/processed/insurance_clean.csv
+```
+
+Workflow (run inside the activated venv):
 ```powershell
+# initialize once (already done in repo)
 dvc init
 dvc remote add -d localstorage .dvc/storage
-dvc add data/raw/insurance.csv
-git add data/raw/insurance.csv.dvc .gitignore
-git commit -m "chore: track raw data with dvc"
+
+# reproduce pipeline
+dvc repro
+
+# check status
+dvc status
+
+# push tracked data to remote
 dvc push
 ```
 
+Tracked data:
+- Raw: `data/raw/MachineLearningRating_v3.txt` (`.dvc` tracked)
+- Processed: `data/processed/insurance_clean.csv` (stage output)
+
+Notes:
+- `.gitignore` keeps data ignored but allows `.dvc` metadata to be tracked under `data/`.
+- Always activate `.venv` before running `dvc repro` to ensure consistent deps.
+
 ## Tasks (alignment with brief)
 - **Task 1 (EDA & Stats)**: summaries, dtype checks, missingness, univariate/bivariate plots, geography/vehicle/gender splits, outliers, 3+ insight plots.
-- **Task 2 (DVC)**: init DVC, set remote, add data, commit .dvc, push.
+- **Task 2 (DVC)**: init DVC, set remote, add raw/processed data via pipeline stage, commit `.dvc`/`dvc.lock`, push to remote.
 - **Task 3 (Hypothesis Testing)**: tests on provinces, zip codes, margin differences, gender; report p-values and business interpretation.
 - **Task 4 (Modeling)**: severity regression, premium prediction (and optional claim probability), compare Linear/RandomForest/XGBoost; report RMSE/R² (regression) and feature importance with SHAP/LIME.
 
@@ -78,6 +109,46 @@ dvc push
 - `outputs/models/` — artifacts, metrics, feature importances.
 - `reports/interim.md` — covers Task 1–2.
 - `reports/final.md` — Medium-style report: overview, approach, EDA, tests, modeling, recommendations, limitations.
+
+### Key Figures (grid view)
+<table>
+  <tr>
+    <td align="center">
+      <img src="outputs/figures/total_premium_hist.png" alt="Total Premium Distribution" width="240" /><br/>
+      <sub>Total Premium Distribution</sub>
+    </td>
+    <td align="center">
+      <img src="outputs/figures/total_claims_hist.png" alt="Total Claims Distribution" width="240" /><br/>
+      <sub>Total Claims Distribution</sub>
+    </td>
+    <td align="center">
+      <img src="outputs/figures/total_claims_box.png" alt="Total Claims Outliers" width="240" /><br/>
+      <sub>Total Claims Outliers</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="outputs/figures/loss_ratio_by_province.png" alt="Loss Ratio by Province" width="240" /><br/>
+      <sub>Loss Ratio by Province (Top 10)</sub>
+    </td>
+    <td align="center">
+      <img src="outputs/figures/loss_ratio_by_vehicle_type.png" alt="Loss Ratio by Vehicle" width="240" /><br/>
+      <sub>Loss Ratio by Vehicle Type (Top 12)</sub>
+    </td>
+    <td align="center">
+      <img src="outputs/figures/monthly_loss_ratio.png" alt="Monthly Loss Ratio" width="240" /><br/>
+      <sub>Monthly Loss Ratio Trend</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="outputs/figures/monthly_claim_frequency.png" alt="Monthly Claim Frequency" width="240" /><br/>
+      <sub>Monthly Claim Frequency Trend</sub>
+    </td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
 ## Testing
 ```powershell
